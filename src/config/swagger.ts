@@ -1,10 +1,12 @@
 import type { OpenAPIV3 } from 'openapi-types';
 
+import { appConfig } from './app.js';
+
 export const swaggerDocument: OpenAPIV3.Document = {
   openapi: '3.0.3',
   info: {
     title: 'Personal Platform API',
-    version: '0.1.0',
+    version: appConfig.version,
     description: 'Base API contract for the Personal Platform backend.',
   },
   servers: [
@@ -26,11 +28,20 @@ export const swaggerDocument: OpenAPIV3.Document = {
               'application/json': {
                 schema: {
                   type: 'object',
-                  required: ['status', 'timestamp', 'uptime'],
+                  required: ['status', 'version', 'environment', 'timestamp', 'uptime'],
                   properties: {
                     status: {
                       type: 'string',
                       example: 'ok',
+                    },
+                    version: {
+                      type: 'string',
+                      example: appConfig.version,
+                    },
+                    environment: {
+                      type: 'string',
+                      enum: ['development', 'test', 'production'],
+                      example: 'development',
                     },
                     timestamp: {
                       type: 'string',
@@ -61,6 +72,13 @@ export const swaggerDocument: OpenAPIV3.Document = {
     },
   },
   components: {
+    securitySchemes: {
+      bearerAuth: {
+        type: 'http',
+        scheme: 'bearer',
+        bearerFormat: 'JWT',
+      },
+    },
     schemas: {
       ErrorResponse: {
         type: 'object',

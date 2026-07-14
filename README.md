@@ -94,3 +94,19 @@ npm test
 - `npm run prisma:migrate`
 - `npm run prisma:studio`
 # personal-platform-be
+
+## Health response and HTTP logs
+
+`GET /api/v1/health` returns public runtime status only:
+
+```json
+{
+  "status": "ok",
+  "version": "0.1.0",
+  "environment": "development",
+  "timestamp": "2026-07-14T12:00:00.000Z",
+  "uptime": 120.5
+}
+```
+
+HTTP request logs are compact by default and include request id, method, URL, status code, response time, and remote address when available. Request/response headers, bodies, cookies, and authorization data are not logged by default.
