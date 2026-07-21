@@ -41,6 +41,9 @@ PORT=4000
 DATABASE_URL=postgresql://postgres:postgres@localhost:5432/personal_platform
 CORS_ORIGIN=http://localhost:3000
 LOG_LEVEL=info
+BCRYPT_SALT_ROUNDS=12
+EMAIL_VERIFICATION_TOKEN_TTL_MINUTES=60
+FRONTEND_URL=http://localhost:3000
 ```
 
 Сервер не стартує, якщо обов'язкові змінні середовища некоректні.
@@ -49,10 +52,20 @@ LOG_LEVEL=info
 
 ```bash
 npm run prisma:generate
+npx prisma migrate dev
+npm run prisma:studio
 ```
 
-На цьому етапі Prisma schema містить тільки `generator` і `datasource`, без бізнес-моделей.
+Initial migration `init_auth_models` creates the first Auth data layer:
 
+- `User`
+- `Profile`
+- `UserSettings`
+- `AuthSession`
+- `ExternalAccount`
+- `EmailVerificationToken`
+
+Use `npx prisma migrate dev --name init_auth_models` when creating the migration locally. Use `npm run prisma:studio` to inspect the local PostgreSQL structure after migration.
 ## Запуск
 
 ```bash
@@ -73,6 +86,19 @@ npm test
 ```
 
 Тести використовують Supertest напряму проти Express application і не відкривають реальний HTTP-порт.
+
+
+## Auth register
+
+`POST /api/v1/auth/register` creates a user with email/password, default profile, default settings, and an email verification token hash. It does not issue JWTs or create sessions yet.
+
+```bash
+curl -i -X POST http://localhost:4000/api/v1/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{"email":"test@example.com","password":"StrongPassword1!","displayName":"Test User"}'
+```
+
+In development the console email provider prints a verification URL like `http://localhost:3000/verify-email?token=...`. The raw token is not stored in the database.
 
 ## URL
 

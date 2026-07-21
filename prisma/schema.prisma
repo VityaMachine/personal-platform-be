@@ -6,3 +6,130 @@ datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
 }
+
+enum UserRole {
+  USER
+  ADMIN
+}
+
+enum StartOfWeek {
+  MONDAY
+  SUNDAY
+}
+
+enum StartupPage {
+  DASHBOARD
+  CALENDAR
+  TASKS
+}
+
+enum Locale {
+  UK
+  EN
+}
+
+enum Theme {
+  SYSTEM
+  LIGHT
+  DARK
+}
+
+enum AuthProvider {
+  GOOGLE
+}
+
+model User {
+  id              String   @id @default(cuid())
+  email           String   @unique
+  passwordHash    String?
+  role            UserRole @default(USER)
+  isEmailVerified Boolean  @default(false)
+
+  profile                 Profile?
+  settings                UserSettings?
+  authSessions            AuthSession[]
+  externalAccounts        ExternalAccount[]
+  emailVerificationTokens EmailVerificationToken[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Profile {
+  id          String  @id @default(cuid())
+  userId      String  @unique
+  displayName String?
+  avatarUrl   String?
+  timeZone    String  @default("Europe/Kyiv")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model UserSettings {
+  id                   String      @id @default(cuid())
+  userId               String      @unique
+  startOfWeek          StartOfWeek @default(MONDAY)
+  startupPage          StartupPage @default(DASHBOARD)
+  locale               Locale      @default(UK)
+  theme                Theme       @default(SYSTEM)
+  notificationsEnabled Boolean     @default(true)
+  quietHoursEnabled    Boolean     @default(false)
+  quietHoursStart      String?
+  quietHoursEnd        String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model AuthSession {
+  id               String    @id @default(cuid())
+  userId           String
+  refreshTokenHash String
+  expiresAt        DateTime
+  revokedAt        DateTime?
+  userAgent        String?
+  ipAddress        String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+model ExternalAccount {
+  id                String       @id @default(cuid())
+  userId            String
+  provider          AuthProvider
+  providerAccountId String
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([provider, providerAccountId])
+  @@index([userId])
+}
+
+model EmailVerificationToken {
+  id        String    @id @default(cuid())
+  userId    String
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([expiresAt])
+}

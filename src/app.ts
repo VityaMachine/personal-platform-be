@@ -9,6 +9,7 @@ import { errorHandler } from './common/middleware/error-handler.js';
 import { notFoundMiddleware } from './common/middleware/not-found.js';
 import { requestIdMiddleware } from './common/middleware/request-id.js';
 import { httpLogger } from './infrastructure/logger/logger.js';
+import { authRouter } from './modules/auth/auth.routes.js';
 import { healthRouter } from './modules/health/health.routes.js';
 
 export function createApp(): express.Express {
@@ -20,12 +21,13 @@ export function createApp(): express.Express {
       origin: env.CORS_ORIGIN,
     }),
   );
-  app.use(express.json());
+  app.use(express.json({ limit: '100kb' }));
   app.use(requestIdMiddleware);
   app.use(httpLogger);
 
   app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(swaggerDocument));
   app.use('/api/v1', healthRouter);
+  app.use('/api/v1', authRouter);
 
   app.use(notFoundMiddleware);
   app.use(errorHandler);
