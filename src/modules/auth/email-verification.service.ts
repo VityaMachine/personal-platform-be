@@ -1,6 +1,5 @@
-import { createHash, randomBytes } from 'node:crypto';
-
 import { env } from '../../config/env.js';
+import { hashToken, tokenService } from './token.service.js';
 
 interface VerificationTokenData {
   rawToken: string;
@@ -10,7 +9,7 @@ interface VerificationTokenData {
 
 export class EmailVerificationService {
   public generateToken(): VerificationTokenData {
-    const rawToken = randomBytes(32).toString('base64url');
+    const rawToken = tokenService.generateOpaqueToken();
 
     return {
       rawToken,
@@ -20,7 +19,7 @@ export class EmailVerificationService {
   }
 
   public hashToken(rawToken: string): string {
-    return createHash('sha256').update(rawToken).digest('hex');
+    return hashToken(rawToken);
   }
 
   public calculateExpiry(): Date {

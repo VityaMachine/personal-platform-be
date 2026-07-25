@@ -39,3 +39,35 @@ export const verifyEmailBodySchema = z.object({
 });
 
 export type VerifyEmailBody = z.infer<typeof verifyEmailBodySchema>;
+
+export const loginBodySchema = z.object({
+  email: z
+    .string({
+      required_error: 'Email is required',
+      invalid_type_error: 'Email must be a string',
+    })
+    .trim()
+    .toLowerCase()
+    .email()
+    .max(254),
+  password: z
+    .string({
+      required_error: 'Password is required',
+      invalid_type_error: 'Password must be a string',
+    })
+    .min(1, 'Password must not be empty'),
+});
+
+export type LoginBody = z.infer<typeof loginBodySchema>;
+
+export const refreshBodySchema = z.object({
+  refreshToken: z
+    .string({
+      required_error: 'Refresh token is required',
+      invalid_type_error: 'Refresh token must be a string',
+    })
+    .trim()
+    .min(1, 'Refresh token must not be empty'),
+});
+
+export type RefreshBody = z.infer<typeof refreshBodySchema>;

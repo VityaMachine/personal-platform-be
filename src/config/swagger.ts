@@ -201,6 +201,108 @@ export const swaggerDocument: OpenAPIV3.Document = {
         },
       },
     },
+    '/auth/login': {
+      post: {
+        summary: 'Log in with email and password',
+        operationId: 'login',
+        tags: ['Auth'],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: { $ref: '#/components/schemas/LoginRequest' },
+              example: { email: 'user@example.com', password: 'Test123!' },
+            },
+          },
+        },
+        responses: {
+          '200': {
+            description: 'Login successful',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/LoginResponse' },
+              },
+            },
+          },
+          '400': {
+            description: 'Validation error',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/ErrorResponse' },
+              },
+            },
+          },
+          '401': {
+            description: 'Invalid email or password',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/ErrorResponse' },
+              },
+            },
+          },
+          '403': {
+            description: 'Email address is not verified',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/ErrorResponse' },
+              },
+            },
+          },
+        },
+      },
+    },
+    '/auth/refresh': {
+      post: {
+        summary: 'Rotate a refresh token and issue a new token pair',
+        description:
+          'A successful refresh invalidates the supplied refresh token. Only the returned refresh token remains valid.',
+        operationId: 'refreshSession',
+        tags: ['Auth'],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: { $ref: '#/components/schemas/RefreshRequest' },
+              example: { refreshToken: 'raw opaque refresh token' },
+            },
+          },
+        },
+        responses: {
+          '200': {
+            description: 'Token pair rotated successfully',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/LoginResponse' },
+              },
+            },
+          },
+          '400': {
+            description: 'Validation error',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/ErrorResponse' },
+              },
+            },
+          },
+          '401': {
+            description: 'Invalid, expired, revoked, or replayed refresh token',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/ErrorResponse' },
+              },
+            },
+          },
+          '403': {
+            description: 'Email address is not verified',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/ErrorResponse' },
+              },
+            },
+          },
+        },
+      },
+    },
   },
   components: {
     securitySchemes: {
@@ -211,6 +313,63 @@ export const swaggerDocument: OpenAPIV3.Document = {
       },
     },
     schemas: {
+      RefreshRequest: {
+        type: 'object',
+        required: ['refreshToken'],
+        properties: {
+          refreshToken: { type: 'string', minLength: 1 },
+        },
+      },
+      LoginRequest: {
+        type: 'object',
+        required: ['email', 'password'],
+        properties: {
+          email: { type: 'string', format: 'email', maxLength: 254 },
+          password: { type: 'string', minLength: 1, format: 'password' },
+        },
+      },
+      LoginResponse: {
+        type: 'object',
+        required: ['accessToken', 'refreshToken', 'tokenType', 'expiresIn', 'user'],
+        properties: {
+          accessToken: { type: 'string' },
+          refreshToken: { type: 'string' },
+          tokenType: { type: 'string', enum: ['Bearer'] },
+          expiresIn: { type: 'integer', example: 900 },
+          user: {
+            type: 'object',
+            required: ['id', 'email', 'role', 'isEmailVerified', 'profile', 'settings'],
+            properties: {
+              id: { type: 'string' },
+              email: { type: 'string', format: 'email' },
+              role: { type: 'string', enum: ['USER', 'ADMIN'] },
+              isEmailVerified: { type: 'boolean', example: true },
+              profile: {
+                type: 'object',
+                required: ['displayName', 'avatarUrl', 'timeZone'],
+                properties: {
+                  displayName: { type: 'string' },
+                  avatarUrl: { type: 'string', nullable: true },
+                  timeZone: { type: 'string', example: 'Europe/Kyiv' },
+                },
+              },
+              settings: {
+                type: 'object',
+                required: ['startOfWeek', 'startupPage', 'locale', 'theme'],
+                properties: {
+                  startOfWeek: { type: 'string', enum: ['MONDAY', 'SUNDAY'] },
+                  startupPage: {
+                    type: 'string',
+                    enum: ['DASHBOARD', 'CALENDAR', 'TASKS'],
+                  },
+                  locale: { type: 'string', enum: ['UK', 'EN'] },
+                  theme: { type: 'string', enum: ['SYSTEM', 'LIGHT', 'DARK'] },
+                },
+              },
+            },
+          },
+        },
+      },
       VerifyEmailRequest: {
         type: 'object',
         required: ['token'],

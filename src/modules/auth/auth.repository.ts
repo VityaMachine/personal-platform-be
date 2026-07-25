@@ -10,6 +10,24 @@ interface CreateUserInput {
   verificationTokenExpiresAt: Date;
 }
 
+interface CreateAuthSessionInput {
+  userId: string;
+  refreshTokenHash: string;
+  expiresAt: Date;
+  userAgent?: string | undefined;
+  ipAddress?: string | undefined;
+}
+
+interface RotateAuthSessionInput {
+  sessionId: string;
+  currentRefreshTokenHash: string;
+  nextRefreshTokenHash: string;
+  expiresAt: Date;
+  rotatedAt: Date;
+  userAgent?: string | undefined;
+  ipAddress?: string | undefined;
+}
+
 export type RegisteredUserRecord = Prisma.UserGetPayload<{
   include: {
     profile: true;
@@ -21,6 +39,24 @@ export type VerificationTokenRecord = Prisma.EmailVerificationTokenGetPayload<{
   include: { user: true };
 }>;
 
+export type LoginUserRecord = Prisma.UserGetPayload<{
+  include: {
+    profile: true;
+    settings: true;
+  };
+}>;
+
+export type RefreshSessionRecord = Prisma.AuthSessionGetPayload<{
+  include: {
+    user: {
+      include: {
+        profile: true;
+        settings: true;
+      };
+    };
+  };
+}>;
+
 export class AuthRepository {
   public constructor(private readonly client: PrismaClient = prisma) {}
 
@@ -30,6 +66,80 @@ export class AuthRepository {
   ): Promise<User | null> {
     return tx.user.findUnique({
       where: { email },
+    });
+  }
+
+  public async findLoginUserByEmail(email: string): Promise<LoginUserRecord | null> {
+    return this.client.user.findUnique({
+      where: { email },
+      include: {
+        profile: true,
+        settings: true,
+      },
+    });
+  }
+
+  public async createAuthSession(input: CreateAuthSessionInput) {
+    return this.client.authSession.create({
+      data: {
+        userId: input.userId,
+        refreshTokenHash: input.refreshTokenHash,
+        expiresAt: input.expiresAt,
+        revokedAt: null,
+        userAgent: input.userAgent ?? null,
+        ipAddress: input.ipAddress ?? null,
+      },
+    });
+  }
+
+  public async deleteAuthSession(sessionId: string): Promise<void> {
+    await this.client.authSession.delete({
+      where: { id: sessionId },
+    });
+  }
+
+  public async findRefreshSessionByHash(
+    refreshTokenHash: string,
+  ): Promise<RefreshSessionRecord | null> {
+    return this.client.authSession.findFirst({
+      where: { refreshTokenHash },
+      include: {
+        user: {
+          include: {
+            profile: true,
+            settings: true,
+          },
+        },
+      },
+    });
+  }
+
+  public async rotateAuthSessionAtomically<TResult>(
+    input: RotateAuthSessionInput,
+    beforeCommit: () => TResult | Promise<TResult>,
+  ): Promise<TResult | null> {
+    return this.client.$transaction(async (tx) => {
+      const result = await tx.authSession.updateMany({
+        where: {
+          id: input.sessionId,
+          refreshTokenHash: input.currentRefreshTokenHash,
+          revokedAt: null,
+          expiresAt: { gt: input.rotatedAt },
+        },
+        data: {
+          refreshTokenHash: input.nextRefreshTokenHash,
+          expiresAt: input.expiresAt,
+          revokedAt: null,
+          userAgent: input.userAgent ?? null,
+          ipAddress: input.ipAddress ?? null,
+        },
+      });
+
+      if (result.count !== 1) {
+        return null;
+      }
+
+      return beforeCommit();
     });
   }
 

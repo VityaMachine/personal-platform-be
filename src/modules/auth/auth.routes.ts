@@ -1,8 +1,13 @@
 import { Router } from 'express';
 
 import { validateRequest } from '../../common/middleware/validate-request.js';
-import { register, verifyEmail } from './auth.controller.js';
-import { registerBodySchema, verifyEmailBodySchema } from './auth.schemas.js';
+import { login, refresh, register, verifyEmail } from './auth.controller.js';
+import {
+  loginBodySchema,
+  refreshBodySchema,
+  registerBodySchema,
+  verifyEmailBodySchema,
+} from './auth.schemas.js';
 
 export const authRouter = Router();
 
@@ -12,3 +17,5 @@ authRouter.post(
   validateRequest({ body: verifyEmailBodySchema }),
   verifyEmail,
 );
+authRouter.post('/auth/login', validateRequest({ body: loginBodySchema }), login);
+authRouter.post('/auth/refresh', validateRequest({ body: refreshBodySchema }), refresh);

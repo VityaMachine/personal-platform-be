@@ -1,4 +1,4 @@
-import type { Locale, StartOfWeek, StartupPage, Theme } from '@prisma/client';
+import type { Locale, StartOfWeek, StartupPage, Theme, UserRole } from '@prisma/client';
 
 export interface RegisterInput {
   email: string;
@@ -42,4 +42,55 @@ export interface EmailVerifiedEvent {
   userId: string;
   email: string;
   verifiedAt: string;
+}
+
+export interface LoginInput {
+  email: string;
+  password: string;
+  userAgent?: string | undefined;
+  ipAddress?: string | undefined;
+}
+
+export interface LoginResult {
+  accessToken: string;
+  refreshToken: string;
+  tokenType: 'Bearer';
+  expiresIn: number;
+  user: {
+    id: string;
+    email: string;
+    role: UserRole;
+    isEmailVerified: true;
+    profile: {
+      displayName: string;
+      avatarUrl: string | null;
+      timeZone: string;
+    };
+    settings: {
+      startOfWeek: StartOfWeek;
+      startupPage: StartupPage;
+      locale: Locale;
+      theme: Theme;
+    };
+  };
+}
+
+export interface UserLoggedInEvent {
+  userId: string;
+  email: string;
+  sessionId: string;
+  loggedInAt: string;
+}
+
+export interface RefreshInput {
+  refreshToken: string;
+  userAgent?: string | undefined;
+  ipAddress?: string | undefined;
+}
+
+export interface SessionRefreshedEvent {
+  userId: string;
+  email: string;
+  sessionId: string;
+  refreshedAt: string;
 }
