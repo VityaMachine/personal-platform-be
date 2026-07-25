@@ -4,14 +4,24 @@ import { AppError } from '../../common/errors/app-error.js';
 import { ErrorCodes } from '../../common/errors/error-codes.js';
 import { eventBus } from '../../infrastructure/events/event-bus.js';
 import { logger } from '../../infrastructure/logger/logger.js';
-import { authRepository, type AuthRepository, type RegisteredUserRecord } from './auth.repository.js';
+import {
+  authRepository,
+  type AuthRepository,
+  type RegisteredUserRecord,
+} from './auth.repository.js';
 import { emailProvider, type EmailProvider } from './email-provider.js';
 import {
   emailVerificationService,
   type EmailVerificationService,
 } from './email-verification.service.js';
 import { passwordService, type PasswordService } from './password.service.js';
-import type { RegisterInput, RegisterResult, UserRegisteredEvent } from './auth.types.js';
+import type {
+  EmailVerifiedEvent,
+  RegisterInput,
+  RegisterResult,
+  UserRegisteredEvent,
+  VerifyEmailResult,
+} from './auth.types.js';
 
 export class AuthService {
   public constructor(
@@ -23,7 +33,7 @@ export class AuthService {
 
   public async register(input: RegisterInput): Promise<RegisterResult> {
     const email = input.email.trim().toLowerCase();
-    const displayName = input.displayName ?? null;
+    const displayName = input.displayName.trim();
 
     const existingUser = await this.repository.findUserByEmail(email);
 
@@ -70,6 +80,49 @@ export class AuthService {
     } satisfies UserRegisteredEvent);
 
     return this.toRegisterResult(user);
+  }
+
+  public async verifyEmail(rawToken: string): Promise<VerifyEmailResult> {
+    const tokenHash = this.emailVerification.hashToken(rawToken);
+    const token = await this.repository.findEmailVerificationTokenByHash(tokenHash);
+
+    if (!token || token.usedAt) {
+      throw new AppError({
+        code: ErrorCodes.InvalidVerificationToken,
+        message: 'Invalid verification token',
+        statusCode: 400,
+      });
+    }
+
+    const verifiedAt = new Date();
+    if (token.expiresAt < verifiedAt) {
+      throw new AppError({
+        code: ErrorCodes.VerificationTokenExpired,
+        message: 'Verification token has expired',
+        statusCode: 400,
+      });
+    }
+
+    const user = await this.repository.consumeEmailVerificationToken(
+      token.id,
+      token.userId,
+      verifiedAt,
+    );
+
+    await eventBus.publish('auth.email_verified', {
+      userId: user.id,
+      email: user.email,
+      verifiedAt: verifiedAt.toISOString(),
+    } satisfies EmailVerifiedEvent);
+
+    return {
+      message: 'Email verified successfully',
+      user: {
+        id: user.id,
+        email: user.email,
+        isEmailVerified: true,
+      },
+    };
   }
 
   private toRegisterResult(user: RegisteredUserRecord): RegisterResult {

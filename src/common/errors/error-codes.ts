@@ -3,6 +3,8 @@ export const ErrorCodes = {
   NotFound: 'NOT_FOUND',
   ValidationError: 'VALIDATION_ERROR',
   EmailAlreadyInUse: 'EMAIL_ALREADY_IN_USE',
+  InvalidVerificationToken: 'INVALID_VERIFICATION_TOKEN',
+  VerificationTokenExpired: 'VERIFICATION_TOKEN_EXPIRED',
 } as const;
 
 export type ErrorCode = (typeof ErrorCodes)[keyof typeof ErrorCodes];

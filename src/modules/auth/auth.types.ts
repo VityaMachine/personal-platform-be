@@ -3,7 +3,7 @@ import type { Locale, StartOfWeek, StartupPage, Theme } from '@prisma/client';
 export interface RegisterInput {
   email: string;
   password: string;
-  displayName?: string | null;
+  displayName: string;
 }
 
 export interface RegisterResult {
@@ -11,7 +11,7 @@ export interface RegisterResult {
   email: string;
   isEmailVerified: boolean;
   profile: {
-    displayName: string | null;
+    displayName: string;
     timeZone: string;
   };
   settings: {
@@ -27,4 +27,19 @@ export interface UserRegisteredEvent {
   userId: string;
   email: string;
   occurredAt: string;
+}
+
+export interface VerifyEmailResult {
+  message: 'Email verified successfully';
+  user: {
+    id: string;
+    email: string;
+    isEmailVerified: true;
+  };
+}
+
+export interface EmailVerifiedEvent {
+  userId: string;
+  email: string;
+  verifiedAt: string;
 }

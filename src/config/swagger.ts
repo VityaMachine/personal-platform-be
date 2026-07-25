@@ -134,6 +134,73 @@ export const swaggerDocument: OpenAPIV3.Document = {
         },
       },
     },
+    '/auth/verify-email': {
+      post: {
+        summary: 'Verify a user email address',
+        operationId: 'verifyEmail',
+        tags: ['Auth'],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: { $ref: '#/components/schemas/VerifyEmailRequest' },
+              example: { token: 'raw verification token' },
+            },
+          },
+        },
+        responses: {
+          '200': {
+            description: 'Email verified successfully',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/VerifyEmailResponse' },
+              },
+            },
+          },
+          '400': {
+            description:
+              'Validation error, invalid verification token, or expired verification token',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/ErrorResponse' },
+                examples: {
+                  validation: {
+                    value: {
+                      error: {
+                        code: 'VALIDATION_ERROR',
+                        message: 'Request validation failed',
+                        details: [],
+                        requestId: '00000000-0000-4000-8000-000000000000',
+                      },
+                    },
+                  },
+                  invalidToken: {
+                    value: {
+                      error: {
+                        code: 'INVALID_VERIFICATION_TOKEN',
+                        message: 'Invalid verification token',
+                        details: [],
+                        requestId: '00000000-0000-4000-8000-000000000000',
+                      },
+                    },
+                  },
+                  expiredToken: {
+                    value: {
+                      error: {
+                        code: 'VERIFICATION_TOKEN_EXPIRED',
+                        message: 'Verification token has expired',
+                        details: [],
+                        requestId: '00000000-0000-4000-8000-000000000000',
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
   },
   components: {
     securitySchemes: {
@@ -144,9 +211,32 @@ export const swaggerDocument: OpenAPIV3.Document = {
       },
     },
     schemas: {
+      VerifyEmailRequest: {
+        type: 'object',
+        required: ['token'],
+        properties: {
+          token: { type: 'string', minLength: 1 },
+        },
+      },
+      VerifyEmailResponse: {
+        type: 'object',
+        required: ['message', 'user'],
+        properties: {
+          message: { type: 'string', example: 'Email verified successfully' },
+          user: {
+            type: 'object',
+            required: ['id', 'email', 'isEmailVerified'],
+            properties: {
+              id: { type: 'string' },
+              email: { type: 'string', format: 'email' },
+              isEmailVerified: { type: 'boolean', example: true },
+            },
+          },
+        },
+      },
       RegisterRequest: {
         type: 'object',
-        required: ['email', 'password'],
+        required: ['email', 'password', 'displayName'],
         properties: {
           email: {
             type: 'string',
@@ -160,9 +250,8 @@ export const swaggerDocument: OpenAPIV3.Document = {
           },
           displayName: {
             type: 'string',
-            nullable: true,
-            minLength: 1,
-            maxLength: 100,
+            minLength: 3,
+            maxLength: 50,
           },
         },
       },
@@ -187,7 +276,6 @@ export const swaggerDocument: OpenAPIV3.Document = {
             properties: {
               displayName: {
                 type: 'string',
-                nullable: true,
                 example: 'Vitya',
               },
               timeZone: {

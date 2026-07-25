@@ -5,7 +5,7 @@ import { prisma } from '../../infrastructure/database/prisma.js';
 interface CreateUserInput {
   email: string;
   passwordHash: string;
-  displayName: string | null;
+  displayName: string;
   verificationTokenHash: string;
   verificationTokenExpiresAt: Date;
 }
@@ -17,10 +17,17 @@ export type RegisteredUserRecord = Prisma.UserGetPayload<{
   };
 }>;
 
+export type VerificationTokenRecord = Prisma.EmailVerificationTokenGetPayload<{
+  include: { user: true };
+}>;
+
 export class AuthRepository {
   public constructor(private readonly client: PrismaClient = prisma) {}
 
-  public async findUserByEmail(email: string, tx: Prisma.TransactionClient = this.client): Promise<User | null> {
+  public async findUserByEmail(
+    email: string,
+    tx: Prisma.TransactionClient = this.client,
+  ): Promise<User | null> {
     return tx.user.findUnique({
       where: { email },
     });
@@ -56,6 +63,35 @@ export class AuthRepository {
           profile: true,
           settings: true,
         },
+      });
+
+      return user;
+    });
+  }
+
+  public async findEmailVerificationTokenByHash(
+    tokenHash: string,
+  ): Promise<VerificationTokenRecord | null> {
+    return this.client.emailVerificationToken.findUnique({
+      where: { tokenHash },
+      include: { user: true },
+    });
+  }
+
+  public async consumeEmailVerificationToken(
+    tokenId: string,
+    userId: string,
+    verifiedAt: Date,
+  ): Promise<User> {
+    return this.client.$transaction(async (tx) => {
+      const user = await tx.user.update({
+        where: { id: userId },
+        data: { isEmailVerified: true },
+      });
+
+      await tx.emailVerificationToken.update({
+        where: { id: tokenId },
+        data: { usedAt: verifiedAt },
       });
 
       return user;

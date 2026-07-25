@@ -14,7 +14,7 @@ interface RegisterResponse {
   email: string;
   isEmailVerified: boolean;
   profile: {
-    displayName: string | null;
+    displayName: string;
     timeZone: string;
   };
   settings: {
@@ -185,6 +185,7 @@ describe('auth register', () => {
       .send({
         email,
         password: 'StrongPassword1!',
+        displayName: 'Vitya',
       })
       .expect(201);
 
@@ -193,6 +194,7 @@ describe('auth register', () => {
       .send({
         email: email.toUpperCase(),
         password: 'StrongPassword1!',
+        displayName: 'Vitya',
       })
       .expect(409);
 
@@ -220,6 +222,7 @@ describe('auth register', () => {
       .send({
         email: 'not-an-email',
         password: 'StrongPassword1!',
+        displayName: 'Vitya',
       })
       .expect(400);
 
@@ -237,6 +240,7 @@ describe('auth register', () => {
       .send({
         email: `weak.${Date.now()}@example.com`,
         password: 'password',
+        displayName: 'Vitya',
       })
       .expect(400);
 
@@ -246,6 +250,61 @@ describe('auth register', () => {
     expect(body.error.details).toEqual(
       expect.arrayContaining([expect.objectContaining({ field: 'password' })]),
     );
+  });
+
+  it('accepts a Unicode displayName', async () => {
+    const email = `unicode.${Date.now()}@example.com`;
+    createdEmails.add(email);
+
+    const response = await request(app)
+      .post('/api/v1/auth/register')
+      .send({
+        email,
+        password: 'StrongPassword1!',
+        displayName: 'Вікторія 🌻',
+      })
+      .expect(201);
+
+    const body = response.body as RegisterResponse;
+
+    expect(body.profile.displayName).toBe('Вікторія 🌻');
+
+    const profile = await prisma.profile.findUnique({
+      where: { userId: body.id },
+    });
+    expect(profile?.displayName).toBe('Вікторія 🌻');
+  });
+
+  it.each([
+    ['missing', undefined],
+    ['empty', ''],
+    ['whitespace-only', '   '],
+    ['2-character', 'ab'],
+    ['51-character', 'a'.repeat(51)],
+  ])('returns 400 and creates no profile for a %s displayName', async (_case, displayName) => {
+    const email = `invalid-display-name.${_case}.${Date.now()}@example.com`;
+    const payload: Record<string, string> = {
+      email,
+      password: 'StrongPassword1!',
+    };
+
+    if (displayName !== undefined) {
+      payload.displayName = displayName;
+    }
+
+    const response = await request(app).post('/api/v1/auth/register').send(payload).expect(400);
+    const body = response.body as ErrorResponse;
+
+    expect(body.error.code).toBe('VALIDATION_ERROR');
+    expect(body.error.details).toEqual(
+      expect.arrayContaining([expect.objectContaining({ field: 'displayName' })]),
+    );
+
+    const user = await prisma.user.findUnique({
+      where: { email },
+      include: { profile: true },
+    });
+    expect(user).toBeNull();
   });
 });
 

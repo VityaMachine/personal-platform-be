@@ -32,5 +32,7 @@ describe('Prisma auth schema', () => {
 
     expect(schema).toContain('@@unique([provider, providerAccountId])');
     expect(schema).toContain('onDelete: Cascade');
+    expect(schema).toMatch(/displayName\s+String\s*\n/);
+    expect(schema).not.toMatch(/displayName\s+String\?/);
   });
 });

@@ -11,18 +11,14 @@ const passwordSchema = z
     'Password must contain at least one special character',
   );
 
-const displayNameSchema = z.preprocess(
-  (value) => {
-    if (typeof value !== 'string') {
-      return value;
-    }
-
-    const trimmed = value.trim();
-
-    return trimmed.length > 0 ? trimmed : null;
-  },
-  z.string().min(1).max(100).nullable().optional(),
-);
+const displayNameSchema = z
+  .string({
+    required_error: 'Display name is required',
+    invalid_type_error: 'Display name must be a string',
+  })
+  .trim()
+  .min(3, 'Display name must be at least 3 characters long')
+  .max(50, 'Display name must be at most 50 characters long');
 
 export const registerBodySchema = z.object({
   email: z.string().trim().email().max(254),
@@ -31,3 +27,15 @@ export const registerBodySchema = z.object({
 });
 
 export type RegisterBody = z.infer<typeof registerBodySchema>;
+
+export const verifyEmailBodySchema = z.object({
+  token: z
+    .string({
+      required_error: 'Token is required',
+      invalid_type_error: 'Token must be a string',
+    })
+    .trim()
+    .min(1, 'Token must not be empty'),
+});
+
+export type VerifyEmailBody = z.infer<typeof verifyEmailBodySchema>;
