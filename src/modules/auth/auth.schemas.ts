@@ -71,3 +71,15 @@ export const refreshBodySchema = z.object({
 });
 
 export type RefreshBody = z.infer<typeof refreshBodySchema>;
+
+export const logoutBodySchema = z.object({
+  refreshToken: z
+    .string({
+      required_error: 'Refresh token is required',
+      invalid_type_error: 'Refresh token must be a string',
+    })
+    .trim()
+    .min(1, 'Refresh token must not be empty'),
+});
+
+export type LogoutBody = z.infer<typeof logoutBodySchema>;

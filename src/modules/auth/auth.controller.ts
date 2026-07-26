@@ -1,7 +1,13 @@
 import type { RequestHandler } from 'express';
 
 import { authService } from './auth.service.js';
-import type { LoginBody, RefreshBody, RegisterBody, VerifyEmailBody } from './auth.schemas.js';
+import type {
+  LoginBody,
+  LogoutBody,
+  RefreshBody,
+  RegisterBody,
+  VerifyEmailBody,
+} from './auth.schemas.js';
 
 export const register: RequestHandler = async (req, res, next) => {
   try {
@@ -54,6 +60,16 @@ export const refresh: RequestHandler = async (req, res, next) => {
     });
 
     res.status(200).json(result);
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const logout: RequestHandler = async (req, res, next) => {
+  try {
+    const body = req.body as LogoutBody;
+    await authService.logout({ refreshToken: body.refreshToken });
+    res.sendStatus(204);
   } catch (error) {
     next(error);
   }

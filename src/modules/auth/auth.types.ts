@@ -94,3 +94,13 @@ export interface SessionRefreshedEvent {
   sessionId: string;
   refreshedAt: string;
 }
+
+export interface LogoutInput {
+  refreshToken: string;
+}
+
+export interface UserLoggedOutEvent {
+  userId: string;
+  sessionId: string;
+  loggedOutAt: string;
+}

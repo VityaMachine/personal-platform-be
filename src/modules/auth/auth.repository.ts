@@ -28,6 +28,17 @@ interface RotateAuthSessionInput {
   ipAddress?: string | undefined;
 }
 
+interface RevokeAuthSessionInput {
+  refreshTokenHash: string;
+  revokedAt: Date;
+}
+
+export interface RevokedAuthSessionRecord {
+  id: string;
+  userId: string;
+  revokedAt: Date;
+}
+
 export type RegisteredUserRecord = Prisma.UserGetPayload<{
   include: {
     profile: true;
@@ -141,6 +152,38 @@ export class AuthRepository {
 
       return beforeCommit();
     });
+  }
+
+  public async revokeActiveAuthSession(
+    input: RevokeAuthSessionInput,
+  ): Promise<RevokedAuthSessionRecord | null> {
+    const sessions = await this.client.authSession.updateManyAndReturn({
+      where: {
+        refreshTokenHash: input.refreshTokenHash,
+        revokedAt: null,
+        expiresAt: { gt: input.revokedAt },
+      },
+      data: {
+        revokedAt: input.revokedAt,
+        updatedAt: input.revokedAt,
+      },
+      select: {
+        id: true,
+        userId: true,
+        revokedAt: true,
+      },
+    });
+
+    const session = sessions[0];
+    if (!session?.revokedAt) {
+      return null;
+    }
+
+    return {
+      id: session.id,
+      userId: session.userId,
+      revokedAt: session.revokedAt,
+    };
   }
 
   public async createUserWithProfileSettingsAndVerificationToken(

@@ -303,6 +303,37 @@ export const swaggerDocument: OpenAPIV3.Document = {
         },
       },
     },
+    '/auth/logout': {
+      post: {
+        summary: 'Log out the session associated with a refresh token',
+        description:
+          'Idempotently revokes only the active session associated with the supplied refresh token and prevents future refresh-token use. Unknown, expired, already revoked, and rotated tokens receive the same successful response. Previously issued access tokens are stateless JWTs and may remain cryptographically valid until expiry; protected-route middleware must check the session referenced by accessToken.sessionId to reject a revoked session immediately.',
+        operationId: 'logoutSession',
+        tags: ['Auth'],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: { $ref: '#/components/schemas/LogoutRequest' },
+              example: { refreshToken: 'raw opaque refresh token' },
+            },
+          },
+        },
+        responses: {
+          '204': {
+            description: 'Logout accepted; the response has no body',
+          },
+          '400': {
+            description: 'Validation error',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/ErrorResponse' },
+              },
+            },
+          },
+        },
+      },
+    },
   },
   components: {
     securitySchemes: {
@@ -313,6 +344,13 @@ export const swaggerDocument: OpenAPIV3.Document = {
       },
     },
     schemas: {
+      LogoutRequest: {
+        type: 'object',
+        required: ['refreshToken'],
+        properties: {
+          refreshToken: { type: 'string', minLength: 1 },
+        },
+      },
       RefreshRequest: {
         type: 'object',
         required: ['refreshToken'],

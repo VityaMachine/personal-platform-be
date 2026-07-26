@@ -21,12 +21,14 @@ import type {
   EmailVerifiedEvent,
   LoginInput,
   LoginResult,
+  LogoutInput,
   RefreshInput,
   RegisterInput,
   RegisterResult,
   SessionRefreshedEvent,
   UserRegisteredEvent,
   UserLoggedInEvent,
+  UserLoggedOutEvent,
   VerifyEmailResult,
 } from './auth.types.js';
 
@@ -256,6 +258,25 @@ export class AuthService {
     } satisfies SessionRefreshedEvent);
 
     return this.toTokenResult(user, accessToken, nextRefreshToken);
+  }
+
+  public async logout(input: LogoutInput): Promise<void> {
+    const refreshTokenHash = this.tokens.hash(input.refreshToken);
+    const loggedOutAt = new Date();
+    const session = await this.repository.revokeActiveAuthSession({
+      refreshTokenHash,
+      revokedAt: loggedOutAt,
+    });
+
+    if (!session) {
+      return;
+    }
+
+    await eventBus.publish('auth.user_logged_out', {
+      userId: session.userId,
+      sessionId: session.id,
+      loggedOutAt: session.revokedAt.toISOString(),
+    } satisfies UserLoggedOutEvent);
   }
 
   private toRegisterResult(user: RegisteredUserRecord): RegisterResult {
