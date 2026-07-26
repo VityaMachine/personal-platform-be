@@ -8,6 +8,7 @@ export const ErrorCodes = {
   InvalidCredentials: 'INVALID_CREDENTIALS',
   EmailNotVerified: 'EMAIL_NOT_VERIFIED',
   InvalidRefreshToken: 'INVALID_REFRESH_TOKEN',
+  Unauthorized: 'UNAUTHORIZED',
 } as const;
 
 export type ErrorCode = (typeof ErrorCodes)[keyof typeof ErrorCodes];

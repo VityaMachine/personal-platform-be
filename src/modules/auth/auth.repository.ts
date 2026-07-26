@@ -109,6 +109,12 @@ export class AuthRepository {
     });
   }
 
+  public async revokeAllSessions(userId: string): Promise<void> {
+    await this.client.authSession.deleteMany({
+      where: { userId },
+    });
+  }
+
   public async findRefreshSessionByHash(
     refreshTokenHash: string,
   ): Promise<RefreshSessionRecord | null> {

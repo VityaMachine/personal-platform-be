@@ -18,6 +18,7 @@ import {
 import { passwordService, type PasswordService } from './password.service.js';
 import { tokenService, type TokenService } from './token.service.js';
 import type {
+  AllSessionsLoggedOutEvent,
   EmailVerifiedEvent,
   LoginInput,
   LoginResult,
@@ -277,6 +278,15 @@ export class AuthService {
       sessionId: session.id,
       loggedOutAt: session.revokedAt.toISOString(),
     } satisfies UserLoggedOutEvent);
+  }
+
+  public async logoutAll(userId: string): Promise<void> {
+    await this.repository.revokeAllSessions(userId);
+
+    await eventBus.publish('auth.all_sessions_logged_out', {
+      userId,
+      occurredAt: new Date().toISOString(),
+    } satisfies AllSessionsLoggedOutEvent);
   }
 
   private toRegisterResult(user: RegisteredUserRecord): RegisterResult {

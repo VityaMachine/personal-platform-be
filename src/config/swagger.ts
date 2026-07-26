@@ -334,6 +334,29 @@ export const swaggerDocument: OpenAPIV3.Document = {
         },
       },
     },
+    '/auth/logout-all': {
+      post: {
+        summary: 'Log out all refresh sessions for the authenticated user',
+        description:
+          'Revokes every refresh session belonging to the authenticated user. Sessions owned by other users are unaffected. Access JWTs are stateless and remain valid until expiration.',
+        operationId: 'logoutAllSessions',
+        tags: ['Auth'],
+        security: [{ bearerAuth: [] }],
+        responses: {
+          '204': {
+            description: 'All refresh sessions were revoked; the response has no body',
+          },
+          '401': {
+            description: 'Missing or invalid access token',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/ErrorResponse' },
+              },
+            },
+          },
+        },
+      },
+    },
   },
   components: {
     securitySchemes: {

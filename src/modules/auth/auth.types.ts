@@ -104,3 +104,8 @@ export interface UserLoggedOutEvent {
   sessionId: string;
   loggedOutAt: string;
 }
+
+export interface AllSessionsLoggedOutEvent {
+  userId: string;
+  occurredAt: string;
+}

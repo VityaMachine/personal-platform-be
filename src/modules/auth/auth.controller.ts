@@ -74,3 +74,16 @@ export const logout: RequestHandler = async (req, res, next) => {
     next(error);
   }
 };
+
+export const logoutAll: RequestHandler = async (req, res, next) => {
+  try {
+    if (!req.auth) {
+      throw new Error('Authenticated request is missing auth context');
+    }
+
+    await authService.logoutAll(req.auth.userId);
+    res.sendStatus(204);
+  } catch (error) {
+    next(error);
+  }
+};

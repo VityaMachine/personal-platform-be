@@ -1,0 +1,241 @@
+diff --git a/src/common/errors/error-codes.ts b/src/common/errors/error-codes.ts
+index 8bc45f1..983e390 100644
+--- a/src/common/errors/error-codes.ts
++++ b/src/common/errors/error-codes.ts
+@@ -8,6 +8,7 @@ export const ErrorCodes = {
+   InvalidCredentials: 'INVALID_CREDENTIALS',
+   EmailNotVerified: 'EMAIL_NOT_VERIFIED',
+   InvalidRefreshToken: 'INVALID_REFRESH_TOKEN',
++  Unauthorized: 'UNAUTHORIZED',
+ } as const;
+ 
+ export type ErrorCode = (typeof ErrorCodes)[keyof typeof ErrorCodes];
+diff --git a/src/common/types/express.d.ts b/src/common/types/express.d.ts
+index 9dcb44f..e636f56 100644
+--- a/src/common/types/express.d.ts
++++ b/src/common/types/express.d.ts
+@@ -2,6 +2,10 @@ declare global {
+   namespace Express {
+     interface Request {
+       requestId: string;
++      auth?: {
++        userId: string;
++        sessionId: string;
++      };
+     }
+   }
+ }
+diff --git a/src/config/swagger.ts b/src/config/swagger.ts
+index ae8dcae..abe9296 100644
+--- a/src/config/swagger.ts
++++ b/src/config/swagger.ts
+@@ -334,6 +334,29 @@ export const swaggerDocument: OpenAPIV3.Document = {
+         },
+       },
+     },
++    '/auth/logout-all': {
++      post: {
++        summary: 'Log out all refresh sessions for the authenticated user',
++        description:
++          'Revokes every refresh session belonging to the authenticated user. Sessions owned by other users are unaffected. Access JWTs are stateless and remain valid until expiration.',
++        operationId: 'logoutAllSessions',
++        tags: ['Auth'],
++        security: [{ bearerAuth: [] }],
++        responses: {
++          '204': {
++            description: 'All refresh sessions were revoked; the response has no body',
++          },
++          '401': {
++            description: 'Missing or invalid access token',
++            content: {
++              'application/json': {
++                schema: { $ref: '#/components/schemas/ErrorResponse' },
++              },
++            },
++          },
++        },
++      },
++    },
+   },
+   components: {
+     securitySchemes: {
+diff --git a/src/modules/auth/auth.controller.ts b/src/modules/auth/auth.controller.ts
+index ae1b4bb..9dfe356 100644
+--- a/src/modules/auth/auth.controller.ts
++++ b/src/modules/auth/auth.controller.ts
+@@ -74,3 +74,16 @@ export const logout: RequestHandler = async (req, res, next) => {
+     next(error);
+   }
+ };
++
++export const logoutAll: RequestHandler = async (req, res, next) => {
++  try {
++    if (!req.auth) {
++      throw new Error('Authenticated request is missing auth context');
++    }
++
++    await authService.logoutAll(req.auth.userId);
++    res.sendStatus(204);
++  } catch (error) {
++    next(error);
++  }
++};
+diff --git a/src/modules/auth/auth.repository.ts b/src/modules/auth/auth.repository.ts
+index b09b722..0cb4e9a 100644
+--- a/src/modules/auth/auth.repository.ts
++++ b/src/modules/auth/auth.repository.ts
+@@ -109,6 +109,12 @@ export class AuthRepository {
+     });
+   }
+ 
++  public async revokeAllSessions(userId: string): Promise<void> {
++    await this.client.authSession.deleteMany({
++      where: { userId },
++    });
++  }
++
+   public async findRefreshSessionByHash(
+     refreshTokenHash: string,
+   ): Promise<RefreshSessionRecord | null> {
+diff --git a/src/modules/auth/auth.routes.ts b/src/modules/auth/auth.routes.ts
+index a4670ef..2462d92 100644
+--- a/src/modules/auth/auth.routes.ts
++++ b/src/modules/auth/auth.routes.ts
+@@ -1,7 +1,8 @@
+ import { Router } from 'express';
+ 
+ import { validateRequest } from '../../common/middleware/validate-request.js';
+-import { login, logout, refresh, register, verifyEmail } from './auth.controller.js';
++import { login, logout, logoutAll, refresh, register, verifyEmail } from './auth.controller.js';
++import { authenticateAccessToken } from './auth.middleware.js';
+ import {
+   loginBodySchema,
+   logoutBodySchema,
+@@ -21,3 +22,4 @@ authRouter.post(
+ authRouter.post('/auth/login', validateRequest({ body: loginBodySchema }), login);
+ authRouter.post('/auth/refresh', validateRequest({ body: refreshBodySchema }), refresh);
+ authRouter.post('/auth/logout', validateRequest({ body: logoutBodySchema }), logout);
++authRouter.post('/auth/logout-all', authenticateAccessToken, logoutAll);
+diff --git a/src/modules/auth/auth.service.ts b/src/modules/auth/auth.service.ts
+index fc7c8fd..194511c 100644
+--- a/src/modules/auth/auth.service.ts
++++ b/src/modules/auth/auth.service.ts
+@@ -18,6 +18,7 @@ import {
+ import { passwordService, type PasswordService } from './password.service.js';
+ import { tokenService, type TokenService } from './token.service.js';
+ import type {
++  AllSessionsLoggedOutEvent,
+   EmailVerifiedEvent,
+   LoginInput,
+   LoginResult,
+@@ -279,6 +280,15 @@ export class AuthService {
+     } satisfies UserLoggedOutEvent);
+   }
+ 
++  public async logoutAll(userId: string): Promise<void> {
++    await this.repository.revokeAllSessions(userId);
++
++    await eventBus.publish('auth.all_sessions_logged_out', {
++      userId,
++      occurredAt: new Date().toISOString(),
++    } satisfies AllSessionsLoggedOutEvent);
++  }
++
+   private toRegisterResult(user: RegisteredUserRecord): RegisterResult {
+     if (!user.profile || !user.settings) {
+       throw new Error('Registered user is missing profile or settings');
+diff --git a/src/modules/auth/auth.types.ts b/src/modules/auth/auth.types.ts
+index cf89022..8eb3891 100644
+--- a/src/modules/auth/auth.types.ts
++++ b/src/modules/auth/auth.types.ts
+@@ -104,3 +104,8 @@ export interface UserLoggedOutEvent {
+   sessionId: string;
+   loggedOutAt: string;
+ }
++
++export interface AllSessionsLoggedOutEvent {
++  userId: string;
++  occurredAt: string;
++}
+diff --git a/src/modules/auth/token.service.ts b/src/modules/auth/token.service.ts
+index e9ab952..ff57613 100644
+--- a/src/modules/auth/token.service.ts
++++ b/src/modules/auth/token.service.ts
+@@ -1,4 +1,4 @@
+-import { createHash, createHmac, randomBytes } from 'node:crypto';
++import { createHash, createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
+ 
+ import { env } from '../../config/env.js';
+ 
+@@ -15,6 +15,23 @@ interface JwtPayload extends AccessTokenClaims {
+   exp: number;
+ }
+ 
++function isJwtPayload(value: unknown): value is JwtPayload {
++  if (!value || typeof value !== 'object') {
++    return false;
++  }
++
++  const payload = value as Record<string, unknown>;
++  return (
++    typeof payload.sub === 'string' &&
++    typeof payload.email === 'string' &&
++    typeof payload.role === 'string' &&
++    typeof payload.sessionId === 'string' &&
++    payload.type === 'access' &&
++    typeof payload.iat === 'number' &&
++    typeof payload.exp === 'number'
++  );
++}
++
+ function encodeJson(value: object): string {
+   return Buffer.from(JSON.stringify(value)).toString('base64url');
+ }
+@@ -49,6 +66,47 @@ export class TokenService {
+     return `${unsignedToken}.${signature}`;
+   }
+ 
++  public verifyAccessToken(token: string): AccessTokenClaims | null {
++    const parts = token.split('.');
++    const encodedHeader = parts[0];
++    const encodedPayload = parts[1];
++    const encodedSignature = parts[2];
++
++    if (!encodedHeader || !encodedPayload || !encodedSignature || parts.length !== 3) {
++      return null;
++    }
++
++    const expectedSignature = createHmac('sha256', env.JWT_ACCESS_SECRET)
++      .update(`${encodedHeader}.${encodedPayload}`)
++      .digest();
++
++    let actualSignature: Buffer;
++    let payload: unknown;
++    try {
++      actualSignature = Buffer.from(encodedSignature, 'base64url');
++      payload = JSON.parse(Buffer.from(encodedPayload, 'base64url').toString('utf8')) as unknown;
++    } catch {
++      return null;
++    }
++
++    if (
++      actualSignature.length !== expectedSignature.length ||
++      !timingSafeEqual(actualSignature, expectedSignature) ||
++      !isJwtPayload(payload) ||
++      payload.exp <= Math.floor(Date.now() / 1000)
++    ) {
++      return null;
++    }
++
++    return {
++      sub: payload.sub,
++      email: payload.email,
++      role: payload.role,
++      sessionId: payload.sessionId,
++      type: payload.type,
++    };
++  }
++
+   public get accessTokenTtlSeconds(): number {
+     return env.JWT_ACCESS_TTL_SECONDS;
+   }
