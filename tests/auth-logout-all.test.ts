@@ -1,11 +1,15 @@
+import express from 'express';
 import request from 'supertest';
 import { describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
 
 import { createApp } from '../src/app.js';
 import { ErrorCodes } from '../src/common/errors/error-codes.js';
+import { errorHandler } from '../src/common/middleware/error-handler.js';
+import { requestIdMiddleware } from '../src/common/middleware/request-id.js';
 import { eventBus } from '../src/infrastructure/events/event-bus.js';
-import { AuthRepository } from '../src/modules/auth/auth.repository.js';
+import { authRepository, AuthRepository } from '../src/modules/auth/auth.repository.js';
+import { logoutAll as logoutAllController } from '../src/modules/auth/auth.controller.js';
 import { authService, AuthService } from '../src/modules/auth/auth.service.js';
 import { tokenService } from '../src/modules/auth/token.service.js';
 
@@ -48,6 +52,10 @@ describe('POST /api/v1/auth/logout-all', () => {
   const app = createApp();
 
   it('returns an empty 204 and passes the authenticated user to the service', async () => {
+    vi.spyOn(authRepository, 'findActiveSessionForAccessToken').mockResolvedValue({
+      id: 'session-1',
+      userId: 'user-1',
+    });
     const logoutAll = vi.spyOn(authService, 'logoutAll').mockResolvedValue();
 
     const response = await request(app)
@@ -79,6 +87,60 @@ describe('POST /api/v1/auth/logout-all', () => {
       .object({ error: z.object({ code: z.string(), requestId: z.string().min(1) }) })
       .parse(response.body);
     expect(body.error.code).toBe(ErrorCodes.Unauthorized);
+  });
+
+  it('rejects access tokens for every deleted session while another user remains authenticated', async () => {
+    const activeSessions = new Map([
+      ['session-1', 'user-1'],
+      ['session-2', 'user-1'],
+      ['session-3', 'user-2'],
+    ]);
+    vi.spyOn(authRepository, 'findActiveSessionForAccessToken').mockImplementation(
+      (sessionId, userId) =>
+        Promise.resolve(
+          activeSessions.get(sessionId) === userId ? { id: sessionId, userId } : null,
+        ),
+    );
+    vi.spyOn(authService, 'logoutAll').mockImplementation((userId) => {
+      for (const [sessionId, ownerId] of activeSessions) {
+        if (ownerId === userId) {
+          activeSessions.delete(sessionId);
+        }
+      }
+      return Promise.resolve();
+    });
+    const firstToken = accessToken('user-1');
+    const secondToken = tokenService.signAccessToken({
+      sub: 'user-1',
+      email: 'user-1@example.com',
+      role: 'USER',
+      sessionId: 'session-2',
+      type: 'access',
+    });
+    const otherUserToken = tokenService.signAccessToken({
+      sub: 'user-2',
+      email: 'user-2@example.com',
+      role: 'USER',
+      sessionId: 'session-3',
+      type: 'access',
+    });
+
+    await request(app)
+      .post('/api/v1/auth/logout-all')
+      .set('authorization', `Bearer ${firstToken}`)
+      .expect(204);
+    await request(app)
+      .post('/api/v1/auth/logout-all')
+      .set('authorization', `Bearer ${firstToken}`)
+      .expect(401);
+    await request(app)
+      .post('/api/v1/auth/logout-all')
+      .set('authorization', `Bearer ${secondToken}`)
+      .expect(401);
+    await request(app)
+      .post('/api/v1/auth/logout-all')
+      .set('authorization', `Bearer ${otherUserToken}`)
+      .expect(204);
   });
 });
 
@@ -137,5 +199,29 @@ describe('AuthService.logoutAll', () => {
 
     await expect(subject.service.logoutAll('user-1')).rejects.toThrow('database failed');
     expect(publish).not.toHaveBeenCalled();
+  });
+});
+
+describe('logoutAll controller invariant', () => {
+  it('returns the dedicated typed error when middleware auth context is absent', async () => {
+    const app = express();
+    app.use(requestIdMiddleware);
+    app.post('/auth/logout-all', logoutAllController);
+    app.use(errorHandler);
+
+    const response = await request(app).post('/auth/logout-all').expect(500);
+    const body = z
+      .object({
+        error: z.object({
+          code: z.string(),
+          message: z.string(),
+        }),
+      })
+      .parse(response.body);
+
+    expect(body.error).toEqual({
+      code: ErrorCodes.AuthContextMissing,
+      message: 'Authenticated request is missing auth context',
+    });
   });
 });

@@ -1,5 +1,7 @@
 import type { RequestHandler } from 'express';
 
+import { AppError } from '../../common/errors/app-error.js';
+import { ErrorCodes } from '../../common/errors/error-codes.js';
 import { authService } from './auth.service.js';
 import type {
   LoginBody,
@@ -78,7 +80,11 @@ export const logout: RequestHandler = async (req, res, next) => {
 export const logoutAll: RequestHandler = async (req, res, next) => {
   try {
     if (!req.auth) {
-      throw new Error('Authenticated request is missing auth context');
+      throw new AppError({
+        code: ErrorCodes.AuthContextMissing,
+        message: 'Authenticated request is missing auth context',
+        statusCode: 500,
+      });
     }
 
     await authService.logoutAll(req.auth.userId);

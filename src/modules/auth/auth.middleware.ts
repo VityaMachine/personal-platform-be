@@ -2,6 +2,7 @@ import type { RequestHandler } from 'express';
 
 import { AppError } from '../../common/errors/app-error.js';
 import { ErrorCodes } from '../../common/errors/error-codes.js';
+import { authRepository } from './auth.repository.js';
 import { tokenService } from './token.service.js';
 
 function unauthorized(): AppError {
@@ -12,7 +13,7 @@ function unauthorized(): AppError {
   });
 }
 
-export const authenticateAccessToken: RequestHandler = (req, _res, next) => {
+export const authenticateAccessToken: RequestHandler = async (req, _res, next) => {
   const authorization = req.get('authorization');
   const match = authorization?.match(/^Bearer ([^\s]+)$/);
 
@@ -27,9 +28,23 @@ export const authenticateAccessToken: RequestHandler = (req, _res, next) => {
     return;
   }
 
-  req.auth = {
-    userId: claims.sub,
-    sessionId: claims.sessionId,
-  };
-  next();
+  try {
+    const session = await authRepository.findActiveSessionForAccessToken(
+      claims.sessionId,
+      claims.sub,
+    );
+    if (!session) {
+      next(unauthorized());
+      return;
+    }
+
+    req.auth = {
+      userId: claims.sub,
+      sessionId: claims.sessionId,
+      role: claims.role,
+    };
+    next();
+  } catch (error) {
+    next(error);
+  }
 };

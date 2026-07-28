@@ -39,6 +39,11 @@ export interface RevokedAuthSessionRecord {
   revokedAt: Date;
 }
 
+export interface AccessAuthSessionRecord {
+  id: string;
+  userId: string;
+}
+
 export type RegisteredUserRecord = Prisma.UserGetPayload<{
   include: {
     profile: true;
@@ -112,6 +117,24 @@ export class AuthRepository {
   public async revokeAllSessions(userId: string): Promise<void> {
     await this.client.authSession.deleteMany({
       where: { userId },
+    });
+  }
+
+  public async findActiveSessionForAccessToken(
+    sessionId: string,
+    userId: string,
+  ): Promise<AccessAuthSessionRecord | null> {
+    return this.client.authSession.findFirst({
+      where: {
+        id: sessionId,
+        userId,
+        revokedAt: null,
+        expiresAt: { gt: new Date() },
+      },
+      select: {
+        id: true,
+        userId: true,
+      },
     });
   }
 

@@ -338,7 +338,7 @@ export const swaggerDocument: OpenAPIV3.Document = {
       post: {
         summary: 'Log out all refresh sessions for the authenticated user',
         description:
-          'Revokes every refresh session belonging to the authenticated user. Sessions owned by other users are unaffected. Access JWTs are stateless and remain valid until expiration.',
+          'Revokes every refresh session belonging to the authenticated user. Sessions owned by other users are unaffected. Protected endpoints validate the AuthSession referenced by each access token, so access tokens associated with the deleted sessions can no longer authenticate. No access-token blacklist is used.',
         operationId: 'logoutAllSessions',
         tags: ['Auth'],
         security: [{ bearerAuth: [] }],

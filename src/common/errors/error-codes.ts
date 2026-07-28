@@ -9,6 +9,7 @@ export const ErrorCodes = {
   EmailNotVerified: 'EMAIL_NOT_VERIFIED',
   InvalidRefreshToken: 'INVALID_REFRESH_TOKEN',
   Unauthorized: 'UNAUTHORIZED',
+  AuthContextMissing: 'AUTH_CONTEXT_MISSING',
 } as const;
 
 export type ErrorCode = (typeof ErrorCodes)[keyof typeof ErrorCodes];

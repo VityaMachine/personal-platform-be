@@ -1,11 +1,12 @@
 import { createHash, createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
+import { UserRole } from '@prisma/client';
 
 import { env } from '../../config/env.js';
 
 export interface AccessTokenClaims {
   sub: string;
   email: string;
-  role: string;
+  role: UserRole;
   sessionId: string;
   type: 'access';
 }
@@ -13,6 +14,20 @@ export interface AccessTokenClaims {
 interface JwtPayload extends AccessTokenClaims {
   iat: number;
   exp: number;
+}
+
+interface JwtHeader {
+  alg: 'HS256';
+  typ: 'JWT';
+}
+
+function isJwtHeader(value: unknown): value is JwtHeader {
+  if (!value || typeof value !== 'object') {
+    return false;
+  }
+
+  const header = value as Record<string, unknown>;
+  return Object.keys(header).length === 2 && header.alg === 'HS256' && header.typ === 'JWT';
 }
 
 function isJwtPayload(value: unknown): value is JwtPayload {
@@ -23,17 +38,29 @@ function isJwtPayload(value: unknown): value is JwtPayload {
   const payload = value as Record<string, unknown>;
   return (
     typeof payload.sub === 'string' &&
+    payload.sub.length > 0 &&
     typeof payload.email === 'string' &&
-    typeof payload.role === 'string' &&
+    payload.email.length > 0 &&
+    (payload.role === UserRole.USER || payload.role === UserRole.ADMIN) &&
     typeof payload.sessionId === 'string' &&
+    payload.sessionId.length > 0 &&
     payload.type === 'access' &&
     typeof payload.iat === 'number' &&
-    typeof payload.exp === 'number'
+    Number.isFinite(payload.iat) &&
+    Number.isInteger(payload.iat) &&
+    typeof payload.exp === 'number' &&
+    Number.isFinite(payload.exp) &&
+    Number.isInteger(payload.exp) &&
+    payload.exp > payload.iat
   );
 }
 
 function encodeJson(value: object): string {
   return Buffer.from(JSON.stringify(value)).toString('base64url');
+}
+
+function isBase64UrlSegment(value: string): boolean {
+  return /^[A-Za-z0-9_-]+$/.test(value) && value.length % 4 !== 1;
 }
 
 export function hashToken(rawToken: string): string {
@@ -76,14 +103,24 @@ export class TokenService {
       return null;
     }
 
+    if (
+      !isBase64UrlSegment(encodedHeader) ||
+      !isBase64UrlSegment(encodedPayload) ||
+      !isBase64UrlSegment(encodedSignature)
+    ) {
+      return null;
+    }
+
     const expectedSignature = createHmac('sha256', env.JWT_ACCESS_SECRET)
       .update(`${encodedHeader}.${encodedPayload}`)
       .digest();
 
     let actualSignature: Buffer;
+    let header: unknown;
     let payload: unknown;
     try {
       actualSignature = Buffer.from(encodedSignature, 'base64url');
+      header = JSON.parse(Buffer.from(encodedHeader, 'base64url').toString('utf8')) as unknown;
       payload = JSON.parse(Buffer.from(encodedPayload, 'base64url').toString('utf8')) as unknown;
     } catch {
       return null;
@@ -92,6 +129,7 @@ export class TokenService {
     if (
       actualSignature.length !== expectedSignature.length ||
       !timingSafeEqual(actualSignature, expectedSignature) ||
+      !isJwtHeader(header) ||
       !isJwtPayload(payload) ||
       payload.exp <= Math.floor(Date.now() / 1000)
     ) {
