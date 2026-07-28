@@ -1,4 +1,4 @@
-import type { Prisma, PrismaClient, User } from '@prisma/client';
+import type { Prisma, PrismaClient, User, UserRole } from '@prisma/client';
 
 import { prisma } from '../../infrastructure/database/prisma.js';
 
@@ -29,6 +29,7 @@ interface RotateAuthSessionInput {
 }
 
 interface RevokeAuthSessionInput {
+  userId: string;
   refreshTokenHash: string;
   revokedAt: Date;
 }
@@ -42,6 +43,16 @@ export interface RevokedAuthSessionRecord {
 export interface AccessAuthSessionRecord {
   id: string;
   userId: string;
+}
+
+export interface CurrentUserRecord {
+  id: string;
+  email: string;
+  role: UserRole;
+  createdAt: Date;
+  profile: {
+    displayName: string;
+  } | null;
 }
 
 export type RegisteredUserRecord = Prisma.UserGetPayload<{
@@ -91,6 +102,23 @@ export class AuthRepository {
       include: {
         profile: true,
         settings: true,
+      },
+    });
+  }
+
+  public async findCurrentUserById(userId: string): Promise<CurrentUserRecord | null> {
+    return this.client.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        email: true,
+        role: true,
+        createdAt: true,
+        profile: {
+          select: {
+            displayName: true,
+          },
+        },
       },
     });
   }
@@ -183,11 +211,12 @@ export class AuthRepository {
     });
   }
 
-  public async revokeActiveAuthSession(
+  public async revokeActiveRefreshSessionForUser(
     input: RevokeAuthSessionInput,
   ): Promise<RevokedAuthSessionRecord | null> {
     const sessions = await this.client.authSession.updateManyAndReturn({
       where: {
+        userId: input.userId,
         refreshTokenHash: input.refreshTokenHash,
         revokedAt: null,
         expiresAt: { gt: input.revokedAt },

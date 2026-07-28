@@ -303,13 +303,50 @@ export const swaggerDocument: OpenAPIV3.Document = {
         },
       },
     },
+    '/auth/me': {
+      get: {
+        summary: 'Get the authenticated user',
+        description:
+          'Returns the current user identified by the validated access token and its active AuthSession.',
+        operationId: 'getCurrentUser',
+        tags: ['Auth'],
+        security: [{ bearerAuth: [] }],
+        responses: {
+          '200': {
+            description: 'Current user',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/CurrentUserResponse' },
+              },
+            },
+          },
+          '401': {
+            description: 'Missing, malformed, expired, or inactive access token',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/ErrorResponse' },
+              },
+            },
+          },
+          '404': {
+            description: 'Authenticated user no longer exists',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/ErrorResponse' },
+              },
+            },
+          },
+        },
+      },
+    },
     '/auth/logout': {
       post: {
         summary: 'Log out the session associated with a refresh token',
         description:
-          'Idempotently revokes only the active session associated with the supplied refresh token and prevents future refresh-token use. Unknown, expired, already revoked, and rotated tokens receive the same successful response. Previously issued access tokens are stateless JWTs and may remain cryptographically valid until expiry; protected-route middleware must check the session referenced by accessToken.sessionId to reject a revoked session immediately.',
+          'Revokes the active session associated with the supplied refresh token only when it belongs to the authenticated user. Unknown, expired, revoked, rotated, and other-user refresh tokens receive the same generic authentication error. Protected routes reject the access token associated with the revoked session immediately because access-token authentication validates its active AuthSession.',
         operationId: 'logoutSession',
         tags: ['Auth'],
+        security: [{ bearerAuth: [] }],
         requestBody: {
           required: true,
           content: {
@@ -325,6 +362,15 @@ export const swaggerDocument: OpenAPIV3.Document = {
           },
           '400': {
             description: 'Validation error',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/ErrorResponse' },
+              },
+            },
+          },
+          '401': {
+            description:
+              'Missing or invalid access token, invalid refresh token, revoked or expired session, or refresh-token ownership mismatch',
             content: {
               'application/json': {
                 schema: { $ref: '#/components/schemas/ErrorResponse' },
@@ -367,6 +413,23 @@ export const swaggerDocument: OpenAPIV3.Document = {
       },
     },
     schemas: {
+      CurrentUserResponse: {
+        type: 'object',
+        required: ['user'],
+        properties: {
+          user: {
+            type: 'object',
+            required: ['id', 'email', 'displayName', 'role', 'createdAt'],
+            properties: {
+              id: { type: 'string' },
+              email: { type: 'string', format: 'email' },
+              displayName: { type: 'string', nullable: true },
+              role: { type: 'string', enum: ['USER', 'ADMIN'] },
+              createdAt: { type: 'string', format: 'date-time' },
+            },
+          },
+        },
+      },
       LogoutRequest: {
         type: 'object',
         required: ['refreshToken'],

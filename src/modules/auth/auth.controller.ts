@@ -67,10 +67,38 @@ export const refresh: RequestHandler = async (req, res, next) => {
   }
 };
 
+export const getCurrentUser: RequestHandler = async (req, res, next) => {
+  try {
+    if (!req.auth) {
+      throw new AppError({
+        code: ErrorCodes.AuthContextMissing,
+        message: 'Authenticated request is missing auth context',
+        statusCode: 500,
+      });
+    }
+
+    const result = await authService.getCurrentUser(req.auth.userId);
+    res.status(200).json(result);
+  } catch (error) {
+    next(error);
+  }
+};
+
 export const logout: RequestHandler = async (req, res, next) => {
   try {
+    if (!req.auth) {
+      throw new AppError({
+        code: ErrorCodes.AuthContextMissing,
+        message: 'Authenticated request is missing auth context',
+        statusCode: 500,
+      });
+    }
+
     const body = req.body as LogoutBody;
-    await authService.logout({ refreshToken: body.refreshToken });
+    await authService.logout({
+      userId: req.auth.userId,
+      refreshToken: body.refreshToken,
+    });
     res.sendStatus(204);
   } catch (error) {
     next(error);

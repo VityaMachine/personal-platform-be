@@ -95,7 +95,18 @@ export interface SessionRefreshedEvent {
   refreshedAt: string;
 }
 
+export interface CurrentUserResult {
+  user: {
+    id: string;
+    email: string;
+    displayName: string | null;
+    role: UserRole;
+    createdAt: string;
+  };
+}
+
 export interface LogoutInput {
+  userId: string;
   refreshToken: string;
 }
 

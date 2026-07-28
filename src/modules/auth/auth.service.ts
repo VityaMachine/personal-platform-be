@@ -19,6 +19,7 @@ import { passwordService, type PasswordService } from './password.service.js';
 import { tokenService, type TokenService } from './token.service.js';
 import type {
   AllSessionsLoggedOutEvent,
+  CurrentUserResult,
   EmailVerifiedEvent,
   LoginInput,
   LoginResult,
@@ -264,13 +265,14 @@ export class AuthService {
   public async logout(input: LogoutInput): Promise<void> {
     const refreshTokenHash = this.tokens.hash(input.refreshToken);
     const loggedOutAt = new Date();
-    const session = await this.repository.revokeActiveAuthSession({
+    const session = await this.repository.revokeActiveRefreshSessionForUser({
+      userId: input.userId,
       refreshTokenHash,
       revokedAt: loggedOutAt,
     });
 
     if (!session) {
-      return;
+      throw this.createInvalidRefreshTokenError();
     }
 
     await eventBus.publish('auth.user_logged_out', {
@@ -278,6 +280,28 @@ export class AuthService {
       sessionId: session.id,
       loggedOutAt: session.revokedAt.toISOString(),
     } satisfies UserLoggedOutEvent);
+  }
+
+  public async getCurrentUser(userId: string): Promise<CurrentUserResult> {
+    const user = await this.repository.findCurrentUserById(userId);
+
+    if (!user) {
+      throw new AppError({
+        code: ErrorCodes.NotFound,
+        message: 'User not found',
+        statusCode: 404,
+      });
+    }
+
+    return {
+      user: {
+        id: user.id,
+        email: user.email,
+        displayName: user.profile?.displayName ?? null,
+        role: user.role,
+        createdAt: user.createdAt.toISOString(),
+      },
+    };
   }
 
   public async logoutAll(userId: string): Promise<void> {
