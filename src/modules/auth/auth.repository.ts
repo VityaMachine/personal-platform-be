@@ -2,7 +2,7 @@ import type { Prisma, PrismaClient, User, UserRole } from '@prisma/client';
 
 import { prisma } from '../../infrastructure/database/prisma.js';
 
-interface CreateUserInput {
+interface CreateRegisteredUserAggregateInput {
   email: string;
   passwordHash: string;
   displayName: string;
@@ -244,8 +244,8 @@ export class AuthRepository {
     };
   }
 
-  public async createUserWithProfileSettingsAndVerificationToken(
-    input: CreateUserInput,
+  public async createRegisteredUserAggregate(
+    input: CreateRegisteredUserAggregateInput,
   ): Promise<RegisteredUserRecord> {
     return this.client.$transaction(async (tx) => {
       const user = await tx.user.create({
@@ -254,29 +254,60 @@ export class AuthRepository {
           passwordHash: input.passwordHash,
           role: 'USER',
           isEmailVerified: false,
-          profile: {
-            create: {
-              displayName: input.displayName,
-              timeZone: 'Europe/Kyiv',
-            },
-          },
-          settings: {
-            create: {},
-          },
-          emailVerificationTokens: {
-            create: {
-              tokenHash: input.verificationTokenHash,
-              expiresAt: input.verificationTokenExpiresAt,
-            },
-          },
         },
+      });
+
+      await tx.profile.create({
+        data: {
+          userId: user.id,
+          displayName: input.displayName,
+          timeZone: 'Europe/Kyiv',
+        },
+      });
+
+      await tx.userSettings.create({
+        data: {
+          userId: user.id,
+        },
+      });
+
+      await tx.emailVerificationToken.create({
+        data: {
+          userId: user.id,
+          tokenHash: input.verificationTokenHash,
+          expiresAt: input.verificationTokenExpiresAt,
+        },
+      });
+
+      const personalSpace = await tx.space.create({
+        data: {
+          name: 'Personal',
+          type: 'PERSONAL',
+          ownerId: user.id,
+        },
+      });
+
+      await tx.spaceMember.create({
+        data: {
+          spaceId: personalSpace.id,
+          userId: user.id,
+          role: 'OWNER',
+        },
+      });
+
+      const registeredUser = await tx.user.findUnique({
+        where: { id: user.id },
         include: {
           profile: true,
           settings: true,
         },
       });
 
-      return user;
+      if (!registeredUser) {
+        throw new Error('Registered user aggregate could not be loaded');
+      }
+
+      return registeredUser;
     });
   }
 

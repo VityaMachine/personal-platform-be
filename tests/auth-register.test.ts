@@ -68,6 +68,21 @@ async function cleanupCreatedUsers(): Promise<void> {
     return;
   }
 
+  const users = await prisma.user.findMany({
+    where: {
+      email: {
+        in: [...createdEmails],
+      },
+    },
+    select: { id: true },
+  });
+  await prisma.space.deleteMany({
+    where: {
+      ownerId: {
+        in: users.map((user) => user.id),
+      },
+    },
+  });
   await prisma.user.deleteMany({
     where: {
       email: {
@@ -79,30 +94,33 @@ async function cleanupCreatedUsers(): Promise<void> {
 }
 
 describe('auth register', () => {
-  beforeAll(async () => {
-    assertSafeTestDatabase(testDatabaseUrl);
-    process.env.NODE_ENV = 'test';
-    process.env.PORT = '4000';
-    process.env.DATABASE_URL = testDatabaseUrl;
-    process.env.TEST_DATABASE_URL = testDatabaseUrl;
-    process.env.CORS_ORIGIN = 'http://localhost:3000';
-    process.env.LOG_LEVEL = 'silent';
-    process.env.BCRYPT_SALT_ROUNDS = '10';
-    process.env.EMAIL_VERIFICATION_TOKEN_TTL_MINUTES = '60';
-    process.env.FRONTEND_URL = 'http://localhost:3000';
+  beforeAll(
+    async () => {
+      assertSafeTestDatabase(testDatabaseUrl);
+      process.env.NODE_ENV = 'test';
+      process.env.PORT = '4000';
+      process.env.DATABASE_URL = testDatabaseUrl;
+      process.env.TEST_DATABASE_URL = testDatabaseUrl;
+      process.env.CORS_ORIGIN = 'http://localhost:3000';
+      process.env.LOG_LEVEL = 'silent';
+      process.env.BCRYPT_SALT_ROUNDS = '10';
+      process.env.EMAIL_VERIFICATION_TOKEN_TTL_MINUTES = '60';
+      process.env.FRONTEND_URL = 'http://localhost:3000';
 
-    runMigrations();
+      runMigrations();
 
-    const appModule = await import('../src/app.js');
-    app = appModule.createApp();
-    prisma = new PrismaClient({
-      datasources: {
-        db: {
-          url: testDatabaseUrl,
+      const appModule = await import('../src/app.js');
+      app = appModule.createApp();
+      prisma = new PrismaClient({
+        datasources: {
+          db: {
+            url: testDatabaseUrl,
+          },
         },
-      },
-    });
-  });
+      });
+    },
+    30_000,
+  );
 
   beforeEach(async () => {
     await cleanupCreatedUsers();
@@ -113,7 +131,7 @@ describe('auth register', () => {
     await prisma?.$disconnect();
   });
 
-  it('registers a user and creates profile, settings, and email verification token hash', async () => {
+  it('registers the complete user aggregate without changing the response contract', async () => {
     const email = `Vitya.${Date.now()}@Example.COM`;
     const normalizedEmail = email.toLowerCase();
     createdEmails.add(normalizedEmail);
@@ -153,6 +171,10 @@ describe('auth register', () => {
         profile: true,
         settings: true,
         emailVerificationTokens: true,
+        ownedSpaces: {
+          where: { type: 'PERSONAL' },
+          include: { members: true },
+        },
       },
     });
 
@@ -171,9 +193,23 @@ describe('auth register', () => {
     expect(user?.passwordHash).toEqual(expect.stringMatching(/^\$2[aby]\$/));
     expect(user?.emailVerificationTokens).toHaveLength(1);
     expect(user?.emailVerificationTokens[0]?.tokenHash).toEqual(expect.stringMatching(/^[a-f0-9]{64}$/));
+    expect(user?.ownedSpaces).toHaveLength(1);
+    expect(user?.ownedSpaces[0]).toMatchObject({
+      name: 'Personal',
+      type: 'PERSONAL',
+      ownerId: user?.id,
+    });
+    expect(user?.ownedSpaces[0]?.members).toHaveLength(1);
+    expect(user?.ownedSpaces[0]?.members[0]).toMatchObject({
+      userId: user?.id,
+      role: 'OWNER',
+    });
 
     expect(response.body).not.toHaveProperty('verificationToken');
     expect(response.body).not.toHaveProperty('tokenHash');
+    expect(response.body).not.toHaveProperty('ownedSpaces');
+    expect(response.body).not.toHaveProperty('spaceMemberships');
+    expect(response.body).not.toHaveProperty('personalSpace');
   });
 
   it('returns 409 when email is already in use', async () => {

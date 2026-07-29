@@ -59,7 +59,7 @@ export class AuthService {
     let user: RegisteredUserRecord;
 
     try {
-      user = await this.repository.createUserWithProfileSettingsAndVerificationToken({
+      user = await this.repository.createRegisteredUserAggregate({
         email,
         passwordHash,
         displayName,

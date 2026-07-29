@@ -38,6 +38,18 @@ enum AuthProvider {
   GOOGLE
 }
 
+enum SpaceType {
+  PERSONAL
+  SHARED
+}
+
+enum SpaceRole {
+  OWNER
+  ADMIN
+  MEMBER
+  VIEWER
+}
+
 model User {
   id              String   @id @default(cuid())
   email           String   @unique
@@ -50,9 +62,42 @@ model User {
   authSessions            AuthSession[]
   externalAccounts        ExternalAccount[]
   emailVerificationTokens EmailVerificationToken[]
+  ownedSpaces             Space[]                  @relation("SpaceOwner")
+  spaceMemberships        SpaceMember[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+model Space {
+  id      String    @id @default(cuid())
+  name    String
+  type    SpaceType
+  ownerId String
+
+  owner   User          @relation("SpaceOwner", fields: [ownerId], references: [id], onDelete: Restrict)
+  members SpaceMember[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([ownerId])
+  @@index([type])
+}
+
+model SpaceMember {
+  id       String    @id @default(cuid())
+  spaceId  String
+  userId   String
+  role     SpaceRole
+  joinedAt DateTime  @default(now())
+
+  space Space @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+  user  User  @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  @@unique([spaceId, userId])
+  @@index([userId])
+  @@index([spaceId, role])
 }
 
 model Profile {

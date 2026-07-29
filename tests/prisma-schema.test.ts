@@ -15,6 +15,8 @@ describe('Prisma auth schema', () => {
       'AuthSession',
       'ExternalAccount',
       'EmailVerificationToken',
+      'Space',
+      'SpaceMember',
     ]) {
       expect(schema).toContain(`model ${modelName} {`);
     }
@@ -26,6 +28,8 @@ describe('Prisma auth schema', () => {
       'Locale',
       'Theme',
       'AuthProvider',
+      'SpaceType',
+      'SpaceRole',
     ]) {
       expect(schema).toContain(`enum ${enumName} {`);
     }
@@ -34,5 +38,12 @@ describe('Prisma auth schema', () => {
     expect(schema).toContain('onDelete: Cascade');
     expect(schema).toMatch(/displayName\s+String\s*\n/);
     expect(schema).not.toMatch(/displayName\s+String\?/);
+    expect(schema).toContain('@@unique([spaceId, userId])');
+    expect(schema).toMatch(
+      /owner\s+User\s+@relation\("SpaceOwner", fields: \[ownerId\], references: \[id\], onDelete: Restrict\)/,
+    );
+    expect(schema).toMatch(
+      /user\s+User\s+@relation\(fields: \[userId\], references: \[id\], onDelete: Restrict\)/,
+    );
   });
 });
