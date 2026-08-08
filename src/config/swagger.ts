@@ -403,6 +403,153 @@ export const swaggerDocument: OpenAPIV3.Document = {
         },
       },
     },
+    '/tasks': {
+      post: {
+        summary: 'Create a personal Task',
+        operationId: 'createTask',
+        tags: ['Tasks'],
+        security: [{ bearerAuth: [] }],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: { $ref: '#/components/schemas/CreateTaskRequest' },
+              example: { title: 'Buy groceries', priority: 'LOW' },
+            },
+          },
+        },
+        responses: {
+          '201': {
+            description: 'Task created',
+            content: { 'application/json': { schema: { $ref: '#/components/schemas/TaskDetail' } } },
+          },
+          '400': { description: 'Validation error', content: { 'application/json': { schema: { $ref: '#/components/schemas/ErrorResponse' } } } },
+          '401': { description: 'Missing or invalid access token', content: { 'application/json': { schema: { $ref: '#/components/schemas/ErrorResponse' } } } },
+          '404': { description: 'Personal Space not found', content: { 'application/json': { schema: { $ref: '#/components/schemas/ErrorResponse' } } } },
+        },
+      },
+      get: {
+        summary: 'List personal Tasks',
+        operationId: 'listTasks',
+        tags: ['Tasks'],
+        security: [{ bearerAuth: [] }],
+        responses: {
+          '200': {
+            description: 'Task list',
+            content: { 'application/json': { schema: { $ref: '#/components/schemas/TaskListResponse' } } },
+          },
+          '401': { description: 'Missing or invalid access token', content: { 'application/json': { schema: { $ref: '#/components/schemas/ErrorResponse' } } } },
+          '404': { description: 'Personal Space not found', content: { 'application/json': { schema: { $ref: '#/components/schemas/ErrorResponse' } } } },
+        },
+      },
+    },
+    '/tasks/{taskId}': {
+      get: {
+        summary: 'Get a personal Task',
+        operationId: 'getTask',
+        tags: ['Tasks'],
+        security: [{ bearerAuth: [] }],
+        parameters: [{ name: 'taskId', in: 'path', required: true, schema: { type: 'string' } }],
+        responses: {
+          '200': { description: 'Task detail', content: { 'application/json': { schema: { $ref: '#/components/schemas/TaskDetail' } } } },
+          '400': { description: 'Validation error', content: { 'application/json': { schema: { $ref: '#/components/schemas/ErrorResponse' } } } },
+          '401': { description: 'Missing or invalid access token', content: { 'application/json': { schema: { $ref: '#/components/schemas/ErrorResponse' } } } },
+          '404': { description: 'Task not found or inaccessible', content: { 'application/json': { schema: { $ref: '#/components/schemas/ErrorResponse' } } } },
+        },
+      },
+      patch: {
+        summary: 'Update a personal Task',
+        operationId: 'updateTask',
+        tags: ['Tasks'],
+        security: [{ bearerAuth: [] }],
+        parameters: [{ name: 'taskId', in: 'path', required: true, schema: { type: 'string' } }],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: { $ref: '#/components/schemas/UpdateTaskRequest' },
+              example: { status: 'IN_PROGRESS' },
+            },
+          },
+        },
+        responses: {
+          '200': { description: 'Task updated', content: { 'application/json': { schema: { $ref: '#/components/schemas/TaskDetail' } } } },
+          '400': { description: 'Validation error', content: { 'application/json': { schema: { $ref: '#/components/schemas/ErrorResponse' } } } },
+          '401': { description: 'Missing or invalid access token', content: { 'application/json': { schema: { $ref: '#/components/schemas/ErrorResponse' } } } },
+          '404': { description: 'Task not found or inaccessible', content: { 'application/json': { schema: { $ref: '#/components/schemas/ErrorResponse' } } } },
+        },
+      },
+      delete: {
+        summary: 'Delete a personal Task',
+        operationId: 'deleteTask',
+        tags: ['Tasks'],
+        security: [{ bearerAuth: [] }],
+        parameters: [{ name: 'taskId', in: 'path', required: true, schema: { type: 'string' } }],
+        responses: {
+          '204': { description: 'Task deleted; response has no body' },
+          '400': { description: 'Validation error', content: { 'application/json': { schema: { $ref: '#/components/schemas/ErrorResponse' } } } },
+          '401': { description: 'Missing or invalid access token', content: { 'application/json': { schema: { $ref: '#/components/schemas/ErrorResponse' } } } },
+          '404': { description: 'Task not found or inaccessible', content: { 'application/json': { schema: { $ref: '#/components/schemas/ErrorResponse' } } } },
+        },
+      },
+    },
+    '/tasks/{taskId}/subtasks': {
+      post: {
+        summary: 'Create a Subtask',
+        operationId: 'createSubtask',
+        tags: ['Tasks'],
+        security: [{ bearerAuth: [] }],
+        parameters: [{ name: 'taskId', in: 'path', required: true, schema: { type: 'string' } }],
+        requestBody: {
+          required: true,
+          content: { 'application/json': { schema: { $ref: '#/components/schemas/CreateSubtaskRequest' }, example: { title: 'Buy milk' } } },
+        },
+        responses: {
+          '201': { description: 'Subtask created', content: { 'application/json': { schema: { $ref: '#/components/schemas/Subtask' } } } },
+          '400': { description: 'Validation error', content: { 'application/json': { schema: { $ref: '#/components/schemas/ErrorResponse' } } } },
+          '401': { description: 'Missing or invalid access token', content: { 'application/json': { schema: { $ref: '#/components/schemas/ErrorResponse' } } } },
+          '404': { description: 'Task not found or inaccessible', content: { 'application/json': { schema: { $ref: '#/components/schemas/ErrorResponse' } } } },
+        },
+      },
+    },
+    '/tasks/{taskId}/subtasks/{subtaskId}': {
+      patch: {
+        summary: 'Update a Subtask',
+        operationId: 'updateSubtask',
+        tags: ['Tasks'],
+        security: [{ bearerAuth: [] }],
+        parameters: [
+          { name: 'taskId', in: 'path', required: true, schema: { type: 'string' } },
+          { name: 'subtaskId', in: 'path', required: true, schema: { type: 'string' } },
+        ],
+        requestBody: {
+          required: true,
+          content: { 'application/json': { schema: { $ref: '#/components/schemas/UpdateSubtaskRequest' }, example: { status: 'DONE' } } },
+        },
+        responses: {
+          '200': { description: 'Subtask updated', content: { 'application/json': { schema: { $ref: '#/components/schemas/Subtask' } } } },
+          '400': { description: 'Validation error', content: { 'application/json': { schema: { $ref: '#/components/schemas/ErrorResponse' } } } },
+          '401': { description: 'Missing or invalid access token', content: { 'application/json': { schema: { $ref: '#/components/schemas/ErrorResponse' } } } },
+          '404': { description: 'Task or Subtask not found or inaccessible', content: { 'application/json': { schema: { $ref: '#/components/schemas/ErrorResponse' } } } },
+        },
+      },
+      delete: {
+        summary: 'Delete a Subtask',
+        operationId: 'deleteSubtask',
+        tags: ['Tasks'],
+        security: [{ bearerAuth: [] }],
+        parameters: [
+          { name: 'taskId', in: 'path', required: true, schema: { type: 'string' } },
+          { name: 'subtaskId', in: 'path', required: true, schema: { type: 'string' } },
+        ],
+        responses: {
+          '204': { description: 'Subtask deleted; response has no body' },
+          '400': { description: 'Validation error', content: { 'application/json': { schema: { $ref: '#/components/schemas/ErrorResponse' } } } },
+          '401': { description: 'Missing or invalid access token', content: { 'application/json': { schema: { $ref: '#/components/schemas/ErrorResponse' } } } },
+          '404': { description: 'Task or Subtask not found or inaccessible', content: { 'application/json': { schema: { $ref: '#/components/schemas/ErrorResponse' } } } },
+        },
+      },
+    },
   },
   components: {
     securitySchemes: {

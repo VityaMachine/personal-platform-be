@@ -11,6 +11,7 @@ import { requestIdMiddleware } from './common/middleware/request-id.js';
 import { httpLogger } from './infrastructure/logger/logger.js';
 import { authRouter } from './modules/auth/auth.routes.js';
 import { healthRouter } from './modules/health/health.routes.js';
+import { tasksRouter } from './modules/tasks/tasks.routes.js';
 
 export function createApp(): express.Express {
   const app = express();
@@ -28,6 +29,7 @@ export function createApp(): express.Express {
   app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(swaggerDocument));
   app.use('/api/v1', healthRouter);
   app.use('/api/v1', authRouter);
+  app.use('/api/v1', tasksRouter);
 
   app.use(notFoundMiddleware);
   app.use(errorHandler);

@@ -17,6 +17,9 @@ describe('Prisma auth schema', () => {
       'EmailVerificationToken',
       'Space',
       'SpaceMember',
+      'Task',
+      'TaskSpace',
+      'Subtask',
     ]) {
       expect(schema).toContain(`model ${modelName} {`);
     }
@@ -30,6 +33,9 @@ describe('Prisma auth schema', () => {
       'AuthProvider',
       'SpaceType',
       'SpaceRole',
+      'TaskStatus',
+      'TaskPriority',
+      'SubtaskStatus',
     ]) {
       expect(schema).toContain(`enum ${enumName} {`);
     }
@@ -39,6 +45,9 @@ describe('Prisma auth schema', () => {
     expect(schema).toMatch(/displayName\s+String\s*\n/);
     expect(schema).not.toMatch(/displayName\s+String\?/);
     expect(schema).toContain('@@unique([spaceId, userId])');
+    expect(schema).toContain('@@unique([taskId, spaceId])');
+    expect(schema).toContain('@@index([spaceId])');
+    expect(schema).toContain('@@index([taskId])');
     expect(schema).toMatch(
       /owner\s+User\s+@relation\("SpaceOwner", fields: \[ownerId\], references: \[id\], onDelete: Restrict\)/,
     );

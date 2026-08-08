@@ -50,6 +50,25 @@ enum SpaceRole {
   VIEWER
 }
 
+enum TaskStatus {
+  TODO
+  IN_PROGRESS
+  DONE
+}
+
+enum TaskPriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+enum SubtaskStatus {
+  TODO
+  IN_PROGRESS
+  DONE
+}
+
 model User {
   id              String   @id @default(cuid())
   email           String   @unique
@@ -75,8 +94,9 @@ model Space {
   type    SpaceType
   ownerId String
 
-  owner   User          @relation("SpaceOwner", fields: [ownerId], references: [id], onDelete: Restrict)
-  members SpaceMember[]
+  owner      User          @relation("SpaceOwner", fields: [ownerId], references: [id], onDelete: Restrict)
+  members    SpaceMember[]
+  taskSpaces TaskSpace[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -98,6 +118,49 @@ model SpaceMember {
   @@unique([spaceId, userId])
   @@index([userId])
   @@index([spaceId, role])
+}
+
+model Task {
+  id          String       @id @default(cuid())
+  title       String
+  description String?
+  status      TaskStatus   @default(TODO)
+  priority    TaskPriority @default(LOW)
+
+  taskSpaces TaskSpace[]
+  subtasks   Subtask[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model TaskSpace {
+  id      String @id @default(cuid())
+  taskId  String
+  spaceId String
+
+  task  Task  @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  space Space @relation(fields: [spaceId], references: [id], onDelete: Restrict)
+
+  createdAt DateTime @default(now())
+
+  @@unique([taskId, spaceId])
+  @@index([spaceId])
+}
+
+model Subtask {
+  id       String        @id @default(cuid())
+  taskId   String
+  title    String
+  status   SubtaskStatus @default(TODO)
+  position Int
+
+  task Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([taskId])
 }
 
 model Profile {
